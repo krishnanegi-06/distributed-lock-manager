@@ -285,6 +285,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="C:\Users\yogyatanegi\Desktop\distribute_lock_manager\src\common\Logger.cpp" />
+    <ClCompile Include="C:\Users\yogyatanegi\Desktop\distribute_lock_manager\src\lock_manager\LockManager.cpp" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>

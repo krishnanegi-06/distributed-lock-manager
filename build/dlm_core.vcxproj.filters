@@ -4,6 +4,9 @@
     <ClCompile Include="C:\Users\yogyatanegi\Desktop\distribute_lock_manager\src\common\Logger.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\yogyatanegi\Desktop\distribute_lock_manager\src\lock_manager\LockManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\yogyatanegi\Desktop\distribute_lock_manager\CMakeLists.txt" />

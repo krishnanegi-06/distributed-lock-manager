@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # into this once and linked into every executable.
 add_library(dlm_core
     src/common/Logger.cpp
+    src/lock_manager/LockManager.cpp
 )
 target_include_directories(dlm_core PUBLIC include)
 
