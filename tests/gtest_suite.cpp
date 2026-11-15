@@ -1,3 +1,7 @@
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <unistd.h>
 #include <gtest/gtest.h>
 #include "dlm/api/ApiServer.h"
 #include "dlm/api/AuthManager.h"
