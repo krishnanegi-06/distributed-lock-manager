@@ -64,7 +64,7 @@ void Logger::log(LogLevel level, const std::string& message) {
     std::string outStr = out.str();
 
     std::lock_guard<std::mutex> lock(mutex_);
-    std::cout << outStr;
+    std::cout << outStr << std::flush;
     if (fileStream_.is_open()) {
         fileStream_ << outStr;
         fileStream_.flush();

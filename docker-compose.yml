@@ -1,0 +1,117 @@
+services:
+  node1:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    command: ["dlm_node", "1", "9001", "--data-dir", "/data", "--log-dir", "/logs", "--daemon", "2:node2:9002", "3:node3:9003"]
+    ports:
+      - "${NODE1_PORT:-9001}:9001"
+    volumes:
+      - node1_data:/data
+      - node1_logs:/logs
+    networks:
+      - dlm_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9001'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  node2:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    command: ["dlm_node", "2", "9002", "--data-dir", "/data", "--log-dir", "/logs", "--daemon", "1:node1:9001", "3:node3:9003"]
+    ports:
+      - "${NODE2_PORT:-9002}:9002"
+    volumes:
+      - node2_data:/data
+      - node2_logs:/logs
+    networks:
+      - dlm_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9002'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  node3:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    command: ["dlm_node", "3", "9003", "--data-dir", "/data", "--log-dir", "/logs", "--daemon", "1:node1:9001", "2:node2:9002"]
+    ports:
+      - "${NODE3_PORT:-9003}:9003"
+    volumes:
+      - node3_data:/data
+      - node3_logs:/logs
+    networks:
+      - dlm_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9003'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    command: ["dlm_api", "--port", "8080", "--data-dir", "/data", "--log-dir", "/logs"]
+    environment:
+      - API_PORT=8080
+      - DLM_NODES=1:node1:9001,2:node2:9002,3:node3:9003
+      - DLM_CORS_ORIGINS=${DLM_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      - DLM_AUTH_SECRET=${DLM_AUTH_SECRET:-}
+      - DLM_ADMIN_USER=${DLM_ADMIN_USER:-}
+      - DLM_ADMIN_PASSWORD=${DLM_ADMIN_PASSWORD:-}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    volumes:
+      - api_data:/data
+      - api_logs:/logs
+    depends_on:
+      node1:
+        condition: service_healthy
+      node2:
+        condition: service_healthy
+      node3:
+        condition: service_healthy
+    networks:
+      - dlm_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/api/health >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - dlm_net
+    restart: unless-stopped
+
+volumes:
+  node1_data:
+  node1_logs:
+  node2_data:
+  node2_logs:
+  node3_data:
+  node3_logs:
+  api_data:
+  api_logs:
+
+networks:
+  dlm_net:
+    driver: bridge

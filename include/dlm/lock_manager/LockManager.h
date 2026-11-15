@@ -1,69 +1,98 @@
 #pragma once
-#include <mutex>
+#include <chrono>
 #include <condition_variable>
+#include <mutex>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <string>
+#include <utility>
 #include <vector>
-#include <chrono>
 #include "dlm/common/Types.h"
-using namespace std;
 
 namespace dlm {
 
 // ---------- data structures ----------
 
-/// One row/table that is currently locked.
+/// One row/key that is currently locked.
 struct LockEntry {
-    LockMode                   mode;
-    std::unordered_set<TxnId>  owners;   // transactions holding this lock
+    LockMode                  mode = LockMode::SHARED;
+    std::unordered_set<TxnId> owners;   // transactions holding this lock
 };
 
-/// An edge in the wait-for graph: waitingTxn is blocked by holdingTxn on
-/// resourceId.
+/// An edge in the wait-for graph: waitingTxn is blocked by holdingTxn on resourceId.
 struct WaitEdge {
-    TxnId      waitingTxn;
-    TxnId      holdingTxn;
+    TxnId      waitingTxn = 0;
+    TxnId      holdingTxn = 0;
     ResourceId resourceId;
+};
+
+/// Snapshot of one resource's lock state for observability and APIs.
+struct LockInfo {
+    ResourceId resourceId;
+    LockMode   mode = LockMode::SHARED;
+    std::vector<TxnId> owners;
+    std::vector<std::pair<TxnId, LockMode>> waiters;
 };
 
 // ---------- local (single-node) lock manager ----------
 
 class LockManager {
 public:
-    /// Acquire a lock.  Blocks until compatible (or timeout expires).
-    /// @return true if granted, false on timeout.
+    /// Acquire a lock. Blocks until compatible (or timeout expires / cancelled).
+    /// Supports lock re-entry and safe SHARED -> EXCLUSIVE upgrades.
+    /// @return true if granted, false on timeout or cancellation.
     bool acquireLock(TxnId txnId, const ResourceId& resourceId, LockMode mode,
-                     chrono::milliseconds timeout = chrono::milliseconds::zero());
+                     std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+
+    /// Downgrade an EXCLUSIVE lock held solely by `txnId` to SHARED.
+    /// @return true if downgraded or already SHARED; false if not held.
+    bool downgradeLock(TxnId txnId, const ResourceId& resourceId);
+
+    /// Cancel any active lock wait for `txnId` without releasing held locks.
+    void cancelWait(TxnId txnId);
 
     /// Release one lock held by txnId.
     void releaseLock(TxnId txnId, const ResourceId& resourceId);
 
-    /// Release every lock held by txnId (used on abort / commit).
+    /// Release every lock held by txnId and cancel any active waits.
     void releaseAllLocks(TxnId txnId);
 
-    /// Check whether txnId currently holds the given lock.
+    /// Check whether txnId currently holds at least `mode` on `resourceId`.
     bool checkLock(TxnId txnId, const ResourceId& resourceId, LockMode mode) const;
 
     /// Return the current set of wait-for edges (for deadlock detection).
     std::vector<WaitEdge> getWaitForEdges() const;
 
+    /// Return a consistent snapshot of all held and waiting locks.
+    std::vector<LockInfo> getLockTableSnapshot() const;
+
+    /// Return only resources with waiting transactions.
+    std::vector<LockInfo> getWaitingLocks() const;
+
 private:
-    bool isCompatible(const LockEntry& entry, TxnId txnId,
-                      LockMode requested) const;
+    struct Waiter {
+        TxnId    txnId;
+        LockMode mode;
+        bool     isUpgrade = false;
+        uint64_t ticket    = 0;
+    };
 
-    mutable mutex      mutex_;
-    condition_variable  cv_;
+    bool isCompatible(const LockEntry& entry, TxnId txnId, LockMode requested) const;
+    bool canGrantLocked(const ResourceId& resourceId, TxnId txnId, LockMode mode,
+                        bool isUpgrade, uint64_t ticket) const;
 
-    // resourceId  →  who owns the lock and in what mode
-    unordered_map<ResourceId, LockEntry> lockTable_;
+    mutable std::mutex      mutex_;
+    std::condition_variable cv_;
+    uint64_t                nextTicket_{1};
 
-    // resourceId  →  ordered queue of (txnId, requested mode) waiting
-    unordered_map<ResourceId,
-                       vector<pair<TxnId, LockMode>>> waiters_;
+    // resourceId -> who owns the lock and in what mode
+    std::unordered_map<ResourceId, LockEntry> lockTable_;
 
-    // txnId  →  set of resources this txn holds
-    unordered_map<TxnId, unordered_set<ResourceId>> txnLocks_;
+    // resourceId -> ordered queue of waiting transactions
+    std::unordered_map<ResourceId, std::vector<Waiter>> waiters_;
+
+    // txnId -> set of resources this txn holds
+    std::unordered_map<TxnId, std::unordered_set<ResourceId>> txnLocks_;
 };
 
 } // namespace dlm

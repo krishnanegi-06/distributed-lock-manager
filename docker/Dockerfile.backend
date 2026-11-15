@@ -1,0 +1,36 @@
+FROM ubuntu:24.04 AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY CMakeLists.txt ./
+COPY include ./include
+COPY src ./src
+COPY tests ./tests
+COPY third_party ./third_party
+
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build -j"$(nproc)" --target dlm_node dlm_api dlm_tests && \
+    ctest --test-dir build --output-on-failure
+
+FROM ubuntu:24.04 AS runtime
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /src/build/dlm_node /usr/local/bin/dlm_node
+COPY --from=builder /src/build/dlm_api /usr/local/bin/dlm_api
+
+RUN mkdir -p /data /logs
+
+ENV DLM_DATA_DIR=/data
+ENV DLM_LOG_DIR=/logs
+
+STOPSIGNAL SIGTERM

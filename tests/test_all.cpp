@@ -253,7 +253,7 @@ void test_txn_manager_prepare() {
 
     bool prepared = tm.prepareTransaction(t1);
     ASSERT_TRUE(prepared);
-    ASSERT_EQ(tm.getTransactionState(t1), TxnState::PREPARING);
+    ASSERT_EQ(tm.getTransactionState(t1), TxnState::PREPARED);
 
     // Commit from prepared state
     tm.commitPrepared(t1);
@@ -281,16 +281,18 @@ void test_transaction_log() {
     }
 
     // Read back
-    TransactionLog log2(logPath);
-    auto entries = log2.readLog();
-    ASSERT_EQ(entries.size(), (size_t)6);
-    ASSERT_EQ(entries[0].type, LogEntry::Type::TXN_BEGIN);
-    ASSERT_EQ(entries[0].txnId, (TxnId)1);
-    ASSERT_EQ(entries[1].type, LogEntry::Type::OPERATION);
-    ASSERT_EQ(entries[2].type, LogEntry::Type::TXN_PREPARE);
-    ASSERT_EQ(entries[3].type, LogEntry::Type::TXN_COMMIT);
-    ASSERT_EQ(entries[4].type, LogEntry::Type::TXN_BEGIN);
-    ASSERT_EQ(entries[5].type, LogEntry::Type::TXN_ABORT);
+    {
+        TransactionLog log2(logPath);
+        auto entries = log2.readLog();
+        ASSERT_EQ(entries.size(), (size_t)6);
+        ASSERT_EQ(entries[0].type, LogEntry::Type::TXN_BEGIN);
+        ASSERT_EQ(entries[0].txnId, (TxnId)1);
+        ASSERT_EQ(entries[1].type, LogEntry::Type::OPERATION);
+        ASSERT_EQ(entries[2].type, LogEntry::Type::TXN_PREPARE);
+        ASSERT_EQ(entries[3].type, LogEntry::Type::TXN_COMMIT);
+        ASSERT_EQ(entries[4].type, LogEntry::Type::TXN_BEGIN);
+        ASSERT_EQ(entries[5].type, LogEntry::Type::TXN_ABORT);
+    }
 
     std::filesystem::remove(logPath);
 }
