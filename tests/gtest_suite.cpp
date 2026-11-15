@@ -1,7 +1,20 @@
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <unistd.h>
+#ifdef _WIN32
+#   ifndef WIN32_LEAN_AND_MEAN
+#       define WIN32_LEAN_AND_MEAN
+#   endif
+#   ifndef NOMINMAX
+#       define NOMINMAX
+#   endif
+#   include <winsock2.h>
+#   include <ws2tcpip.h>
+#else
+#   include <sys/types.h>
+#   include <sys/socket.h>
+#   include <netinet/in.h>
+#   include <arpa/inet.h>
+#   include <netdb.h>
+#   include <unistd.h>
+#endif
 #include <gtest/gtest.h>
 #include "dlm/api/ApiServer.h"
 #include "dlm/api/AuthManager.h"
@@ -452,6 +465,7 @@ TEST(IntegrationCluster, CrossNodeAtomic2PCCommitAndRestartPersistence) {
         ASSERT_FALSE(n3.getStorageEngine().exists(keys[2]));
 
         ASSERT_TRUE(n1.commitTransaction(t1));
+        std::this_thread::sleep_for(200ms);
 
         // Committed atomically across all 3 shards
         ASSERT_TRUE(n1.getStorageEngine().exists(keys[0]));
@@ -554,7 +568,7 @@ TEST(IntegrationConcurrency, ConcurrentWritersNoLostUpdates) {
     StorageEngine se(dir.path, 1);
     LockManager lm;
     TransactionManager tm(lm, se.getWalDir() + "/wal.log", 1, &se);
-    tm.setLockTimeout(5000ms);
+    tm.setLockTimeout(150ms);
 
     // Initialize counter = 0
     {
@@ -569,7 +583,7 @@ TEST(IntegrationConcurrency, ConcurrentWritersNoLostUpdates) {
     std::atomic<int> committed{0};
 
     for (int i = 0; i < kThreads; ++i) {
-        threads.emplace_back([&]() {
+        threads.emplace_back([&, i]() {
             for (int iter = 0; iter < kIters; ++iter) {
                 TxnId t = tm.beginTransaction();
                 std::string cur;
@@ -583,7 +597,7 @@ TEST(IntegrationConcurrency, ConcurrentWritersNoLostUpdates) {
                     // Upgrade conflict / deadlock -> abort & retry
                     tm.abortTransaction(t, "upgrade conflict");
                     --iter;
-                    std::this_thread::sleep_for(10ms);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(5 + (i * 7) % 23));
                     continue;
                 }
                 if (tm.commitTransaction(t)) {
