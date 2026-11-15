@@ -103,7 +103,11 @@ bool httpRequest(const std::string& host, uint16_t port,
 
     std::string resp;
     char buf[4096];
+#ifdef _WIN32
     int n = 0;
+#else
+    ssize_t n = 0;
+#endif
     while ((n = ::recv(sock, buf, sizeof(buf), 0)) > 0) {
         resp.append(buf, static_cast<size_t>(n));
     }
