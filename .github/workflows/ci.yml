@@ -1,0 +1,47 @@
+name: DLM-DB CI
+
+on:
+  push:
+    branches: [ main, krishna ]
+  pull_request:
+    branches: [ main, krishna ]
+
+jobs:
+  linux-sanitizers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure & Build with ASan + UBSan
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-Wall -Wextra -fsanitize=address,undefined -fno-omit-frame-pointer"
+          cmake --build build -j$(nproc)
+      - name: Run CTest Suite
+        run: ctest --test-dir build --output-on-failure
+
+  windows-msvc:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure & Build (MSVC)
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+          cmake --build build --config Debug
+      - name: Run CTest Suite
+        run: ctest --test-dir build -C Debug --output-on-failure
+
+  frontend-check:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install, Typecheck & Build
+        run: |
+          npm ci || npm install
+          npm run typecheck
+          npm run build

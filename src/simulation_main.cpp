@@ -193,59 +193,71 @@ static void scenario5_waitfor_graph(Node& node) {
 //  MAIN
 // =====================================================================
 int main() {
-    Logger::setLevel(LogLevel::INFO);
+    try {
+        Logger::setLevel(LogLevel::INFO);
 
-    // Create logs directory if needed
-    std::filesystem::create_directories("logs");
+        // Create logs directory if needed
+        std::filesystem::create_directories("logs");
 
-    Logger::info("╔═══════════════════════════════════════════════════════════╗");
-    Logger::info("║    Distributed Lock Manager — Multi-Node Simulation      ║");
-    Logger::info("╚═══════════════════════════════════════════════════════════╝\n");
+        Logger::info("==========================================================");
+        Logger::info("    Distributed Lock Manager - Multi-Node Simulation       ");
+        Logger::info("==========================================================\n");
 
-    // --- Configure 3 nodes ---
-    NodeConfig cfg1;
-    cfg1.nodeId = 1;
-    cfg1.port   = 9001;
-    cfg1.peers  = {{2, "127.0.0.1", 9002}, {3, "127.0.0.1", 9003}};
-    cfg1.logDirectory = "logs";
+        // --- Configure 3 nodes ---
+        NodeConfig cfg1;
+        cfg1.nodeId = 1;
+        cfg1.port   = 9001;
+        cfg1.peers  = {{2, "127.0.0.1", 9002}, {3, "127.0.0.1", 9003}};
+        cfg1.logDirectory = "logs";
 
-    NodeConfig cfg2;
-    cfg2.nodeId = 2;
-    cfg2.port   = 9002;
-    cfg2.peers  = {{1, "127.0.0.1", 9001}, {3, "127.0.0.1", 9003}};
-    cfg2.logDirectory = "logs";
+        NodeConfig cfg2;
+        cfg2.nodeId = 2;
+        cfg2.port   = 9002;
+        cfg2.peers  = {{1, "127.0.0.1", 9001}, {3, "127.0.0.1", 9003}};
+        cfg2.logDirectory = "logs";
 
-    NodeConfig cfg3;
-    cfg3.nodeId = 3;
-    cfg3.port   = 9003;
-    cfg3.peers  = {{1, "127.0.0.1", 9001}, {2, "127.0.0.1", 9002}};
-    cfg3.logDirectory = "logs";
+        NodeConfig cfg3;
+        cfg3.nodeId = 3;
+        cfg3.port   = 9003;
+        cfg3.peers  = {{1, "127.0.0.1", 9001}, {2, "127.0.0.1", 9002}};
+        cfg3.logDirectory = "logs";
 
-    Node node1(cfg1);
-    Node node2(cfg2);
-    Node node3(cfg3);
+        Logger::info("Creating nodes...");
+        Node node1(cfg1);
+        Node node2(cfg2);
+        Node node3(cfg3);
 
-    node1.start();
-    node2.start();
-    node3.start();
+        Logger::info("Starting nodes...");
+        node1.start();
+        node2.start();
+        node3.start();
 
-    pause(1500, "Nodes started, waiting for heartbeats");
+        pause(1500, "Nodes started, waiting for heartbeats");
 
-    // Run scenarios
-    scenario1_local_locking(node1);
-    scenario2_deadlock(node1);
-    scenario3_transaction(node2);
-    scenario4_multinode(node1, node2, node3);
-    scenario5_waitfor_graph(node3);
+        // Run scenarios
+        scenario1_local_locking(node1);
+        scenario2_deadlock(node1);
+        scenario3_transaction(node2);
+        scenario4_multinode(node1, node2, node3);
+        scenario5_waitfor_graph(node3);
 
-    // Shutdown
-    Logger::info("Shutting down all nodes...");
-    node1.stop();
-    node2.stop();
-    node3.stop();
+        // Shutdown
+        Logger::info("Shutting down all nodes...");
+        node1.stop();
+        node2.stop();
+        node3.stop();
 
-    Logger::info("╔═══════════════════════════════════════════════════════════╗");
-    Logger::info("║              Simulation Complete                          ║");
-    Logger::info("╚═══════════════════════════════════════════════════════════╝");
-    return 0;
+        Logger::info("==========================================================");
+        Logger::info("              Simulation Complete                          ");
+        Logger::info("==========================================================");
+        return 0;
+
+    } catch (const std::exception& e) {
+        std::cerr << "FATAL ERROR: " << e.what() << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "FATAL ERROR: Unknown exception" << std::endl;
+        return 1;
+    }
 }
+

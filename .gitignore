@@ -28,8 +28,15 @@ cmake-build-*/
 Thumbs.db
 .DS_Store
 
-# Log files (keep the directory, ignore contents)
+# Runtime data, logs, secrets
+data/
 logs/*.log
+.env
+config/nodes.json
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
 
 # CMake generated
 CMakeCache.txt
